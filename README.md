@@ -14,4 +14,4 @@ if you want double type of vector
 Results:
   1. result of main_float -6.29112e-08
   2. result of main_double 6.27585e-10
-  3. grbrefrntnbrfed
+  3. grbrefrntnbrfefegergd
