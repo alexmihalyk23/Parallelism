@@ -49,15 +49,26 @@ void matrix_vector_product_omp(double *a, double *b, double *c, int m, int n)
 	int nthreads = omp_get_num_threads();
 	int threadid = omp_get_thread_num();
 	int items_per_thread = m / nthreads;
-	int lb = threadid * items_per_thread;
-	int ub = (threadid == nthreads - 1) ? (m - 1) : (lb + items_per_thread - 1);
+// N =c.size n= thred_per i = threadid
+	// start = i * (N/n) + (N%n < i ? 1 : 0)
+
+	int lb = threadid * items_per_thread + (n % nthreads < threadid ? n % nthreads : 0);
+	int ub = lb + items_per_thread - 1 + (n % nthreads < threadid ? 1 : 0);
+	// int lb = threadid * (sizeof(c)/items_per_thread) + (sizeof(c) % items_per_thread < threadid ? 1 : 0);
+
+	
+	// int ub = (threadid + 1) * items_per_thread - 1;
+	// printf("test %d %d", lb, ub);
 	for (int i = lb; i <= ub; i++) {
 		c[i] = 0.0;
 		for (int j = 0; j < n; j++)
 			c[i] += a[i * n + j] * b[j];
 	}
+	// int lb = threadid * items_per_thread;
+	// int ub = (threadid == nthreads - 1) ? (m - 1) : (lb + items_per_thread - 1);
 }
 }
+
 
 
 void run_parallel(int m, int n)
