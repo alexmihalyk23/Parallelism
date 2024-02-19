@@ -103,17 +103,15 @@ return t;
 
 int main(int argc, char **argv)
 {
-	int m;
-	int n;
+	size_t m = 1000;
+    size_t n = 1000;
 	
-	 for (int i = 0; i < argc; i++){
-        char* p;
-		m = strtol(argv[1], &p, 10);
-		n = strtol(argv[2], &p, 10);
-		
-	}
+	if (argc > 1)
+        m = atoi(argv[1]);
+    if (argc > 2)
+        n = atoi(argv[2]);
 	
-printf("Matrix-vector product (c[m] = a[m, n] * b[n]; m = %d, n = %d)\n", m, n);
+printf("Matrix-vector product (c[m] = a[m, n] * b[n]; m = %ld, n = %ld)\n", m, n);
 printf("Memory used: %"  PRIu64 " MiB\n", ((m * n + m + n) * sizeof(double)) >> 20);
 
 double tserial = run_serial(m, n);
