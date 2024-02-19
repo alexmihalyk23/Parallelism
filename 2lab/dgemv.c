@@ -104,7 +104,7 @@ int main(int argc, char **argv)
         char* p;
 		m = strtol(argv[1], &p, 10);
 		n = strtol(argv[2], &p, 10);
-		printf("%d", m);
+		
 	}
 	
 printf("Matrix-vector product (c[m] = a[m, n] * b[n]; m = %d, n = %d)\n", m, n);
