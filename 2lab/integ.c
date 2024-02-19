@@ -2,6 +2,7 @@
 #include <math.h>
 #include <time.h>
 #include <omp.h>
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 const double PI = 3.14159265358979323846;
 const double a = -4.0;
@@ -43,8 +44,18 @@ double integrate_omp(double (*func)(double), double a, double b, int n)
         int nthreads = omp_get_num_threads();
         int threadid = omp_get_thread_num();
         int items_per_thread = n / nthreads;
-        int lb = threadid * items_per_thread + (n % nthreads < threadid ? n % nthreads : 0);
-    int ub = lb + items_per_thread - 1 + (n % nthreads < threadid ? 1 : 0);
+        int additional_items = n % nthreads;
+
+        int lb = threadid * items_per_thread + (threadid < additional_items ? threadid : additional_items);
+        int ub = lb + items_per_thread + (threadid < additional_items ? 1 : 0) - 1;
+//         int lb = threadid * items_per_thread + MIN(threadid, n % nthreads);
+// int ub = (threadid + 1) * items_per_thread + MIN(threadid + 1, n % nthreads) - 1;
+        // int lb = threadid * items_per_thread + (n % nthreads < threadid ? n % nthreads : 0);
+        // // int ub = lb + ceil((double)items_per_thread / nthreads) - 1;
+        // int max_items_per_thread = n / nthreads + (threadid < n % nthreads ? 1 : 0);
+        // int ub = lb + max_items_per_thread - 1;
+
+        // int ub = lb + items_per_thread - 1 + (n % nthreads < threadid ? 1 : 0);
         // int lb = threadid * items_per_thread;
         // int ub = (threadid == nthreads - 1) ? (n - 1) : (lb + items_per_thread - 1);
         double sumloc =0.0;

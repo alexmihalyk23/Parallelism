@@ -3,6 +3,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <math.h>
 
 
 
@@ -19,7 +20,7 @@ void matrix_vector_product(double *a, double *b, double *c, int m, int n)
 	}
 }
 
-void run_serial(int m, int n)
+double run_serial(int m, int n)
 {
 	double *a, *b, *c;
 	a = malloc(sizeof(*a) * m * n);
@@ -38,6 +39,7 @@ void run_serial(int m, int n)
 	free(a);
 	free(b);
 	free(c);
+	return t;
 }
 
 
@@ -52,11 +54,14 @@ void matrix_vector_product_omp(double *a, double *b, double *c, int m, int n)
 // N =c.size n= thred_per i = threadid
 	// start = i * (N/n) + (N%n < i ? 1 : 0)
 
-	int lb = threadid * items_per_thread + (n % nthreads < threadid ? n % nthreads : 0);
-	int ub = lb + items_per_thread - 1 + (n % nthreads < threadid ? 1 : 0);
+	// int additional_items = n % nthreads;
+
+    //     int lb = threadid * items_per_thread + (threadid < additional_items ? threadid : additional_items);
+    //     int ub = lb + items_per_thread + (threadid < additional_items ? 1 : 0) - 1;
 	// int lb = threadid * (sizeof(c)/items_per_thread) + (sizeof(c) % items_per_thread < threadid ? 1 : 0);
 
-	
+	int lb = threadid * items_per_thread + (n % nthreads < threadid ? n % nthreads : 0);
+        int ub = lb + ceil((double)items_per_thread / nthreads) - 1;
 	// int ub = (threadid + 1) * items_per_thread - 1;
 	// printf("test %d %d", lb, ub);
 	for (int i = lb; i <= ub; i++) {
@@ -71,7 +76,7 @@ void matrix_vector_product_omp(double *a, double *b, double *c, int m, int n)
 
 
 
-void run_parallel(int m, int n)
+double run_parallel(int m, int n)
 {
 double *a, *b, *c;
 // Allocate memory for 2-d array a[m, n]
@@ -92,6 +97,7 @@ printf("Elapsed time (parallel): %.6f sec.\n", t);
 free(a);
 free(b);
 free(c);
+return t;
 }
 
 
@@ -109,8 +115,9 @@ int main(int argc, char **argv)
 	
 printf("Matrix-vector product (c[m] = a[m, n] * b[n]; m = %d, n = %d)\n", m, n);
 printf("Memory used: %"  PRIu64 " MiB\n", ((m * n + m + n) * sizeof(double)) >> 20);
-run_serial(m, n);
-run_parallel(m,n);
 
+double tserial = run_serial(m, n);
+double tparallel = run_parallel(m,n);
+printf("Speedup: %.2f\n", tserial / tparallel);
 return 0;
 }
