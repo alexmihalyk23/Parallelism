@@ -18,6 +18,7 @@ void matrix_vector_product(double *a, double *b, double *c, int m, int n)
 		for (int j = 0; j < n; j++)
 			c[i] += a[i * n + j] * b[j];
 	}
+	// printf("Matrix = ")
 }
 
 double run_serial(int m, int n)
@@ -35,6 +36,7 @@ double run_serial(int m, int n)
 	double t = omp_get_wtime();
 	matrix_vector_product(a, b, c, m, n);
 	t = omp_get_wtime() - t;
+
 	printf("Elapsed time (serial): %.6f sec.\n", t);
 	free(a);
 	free(b);
@@ -42,38 +44,43 @@ double run_serial(int m, int n)
 	return t;
 }
 
-
-/* matrix_vector_product_omp: Compute matrix-vector product c[m] = a[m][n] * b[n] */
-void matrix_vector_product_omp(double *a, double *b, double *c, int m, int n)
-{
-#pragma omp parallel
-{
-	int nthreads = omp_get_num_threads();
-	int threadid = omp_get_thread_num();
-	int items_per_thread = m / nthreads;
-// N =c.size n= thred_per i = threadid
-	// start = i * (N/n) + (N%n < i ? 1 : 0)
-
-	// int additional_items = n % nthreads;
-
-    //     int lb = threadid * items_per_thread + (threadid < additional_items ? threadid : additional_items);
-    //     int ub = lb + items_per_thread + (threadid < additional_items ? 1 : 0) - 1;
-	// int lb = threadid * (sizeof(c)/items_per_thread) + (sizeof(c) % items_per_thread < threadid ? 1 : 0);
-
-	int lb = threadid * items_per_thread + (n % nthreads < threadid ? n % nthreads : 0);
-        int ub = lb + ceil((double)items_per_thread / nthreads) - 1;
-	// int ub = (threadid + 1) * items_per_thread - 1;
-	// printf("test %d %d", lb, ub);
-	for (int i = lb; i <= ub; i++) {
-		c[i] = 0.0;
-		for (int j = 0; j < n; j++)
-			c[i] += a[i * n + j] * b[j];
-	}
-	// int lb = threadid * items_per_thread;
-	// int ub = (threadid == nthreads - 1) ? (m - 1) : (lb + items_per_thread - 1);
-}
+int LB(int i, int k, int n, int size) {
+    int lb = 0;
+    if (i < k) {
+        lb = i * ((size / n)+1);
+    } else {
+        lb = k * ((size / n)+1) + (i - k) * (size / n);
+    }
+    return lb;
 }
 
+double matrix_vector_product_omp(double *a, double *b, double *c, int m, int n) {
+    double sum = 0.0;
+#pragma omp parallel // Используем механизм редукции для корректного подсчета общей суммы
+    {
+        int nthreads = omp_get_num_threads();
+        int threadid = omp_get_thread_num();
+        int k = m % nthreads;
+        int lb = LB(threadid, k, nthreads, m);
+        int ub = LB(threadid + 1, k, nthreads, m);
+
+        printf("Thread %d: LB %d UB %d\n", threadid, lb, ub);
+
+        double local_sum = 0.0;
+        for (int i = lb; i < ub; i++) {
+            c[i] = 0.0;
+            for (int j = 0; j < n; j++) {
+                c[i] += a[i * n + j] * b[j];
+                // local_sum += c[i]; // Локальная сумма для каждого потока
+            }
+        }
+
+        // sum += local_sum; // Обновляем общую сумму с использованием механизма редукции
+    }
+    // printf("\nTotal sum: %lf\n", sum); // Выводим общую сумму только один раз
+
+    return sum;
+}
 
 
 double run_parallel(int m, int n)
@@ -84,8 +91,8 @@ a = malloc(sizeof(*a) * m * n);
 b = malloc(sizeof(*b) * n);
 c = malloc(sizeof(*c) * m);
 for (int i = 0; i < m; i++) {
-for (int j = 0; j < n; j++)
-a[i * n + j] = i + j;
+	for (int j = 0; j < n; j++)
+		a[i * n + j] = i + j;
 
 }
 for (int j = 0; j < n; j++)
@@ -116,6 +123,7 @@ printf("Memory used: %"  PRIu64 " MiB\n", ((m * n + m + n) * sizeof(double)) >> 
 
 double tserial = run_serial(m, n);
 double tparallel = run_parallel(m,n);
+
 printf("Speedup: %.2f\n", tserial / tparallel);
 return 0;
 }

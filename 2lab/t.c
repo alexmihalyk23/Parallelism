@@ -16,34 +16,59 @@ double cpuSecond()
  */
 void matrix_vector_product(double *a, double *b, double *c, int m, int n)
 {
+    double sum = 0.0;
     for (int i = 0; i < m; i++)
     {
         c[i] = 0.0;
-        for (int j = 0; j < n; j++)
+        for (int j = 0; j < n; j++){
             c[i] += a[i * n + j] * b[j];
+            sum += c[i];
+        }
     }
+    printf("serial %lf\n", sum);
 }
 
-/*
-    matrix_vector_product_omp: Compute matrix-vector product c[m] = a[m][n] * b[n]
-*/
-void matrix_vector_product_omp(double *a, double *b, double *c, int m, int n)
-{
-#pragma omp parallel
+
+
+int LB(int i, int k, int n, int size) {
+    int lb = 0;
+    if (i < k) {
+        lb = i * ((size / n)+1);
+    } else {
+        lb = k * ((size / n)+1) + (i - k) * (size / n);
+    }
+    return lb;
+}
+
+double matrix_vector_product_omp(double *a, double *b, double *c, int m, int n) {
+    double sum = 0.0;
+#pragma omp parallel // Используем механизм редукции для корректного подсчета общей суммы
     {
         int nthreads = omp_get_num_threads();
         int threadid = omp_get_thread_num();
-        int items_per_thread = m / nthreads;
-        int lb = threadid * items_per_thread;
-        int ub = (threadid == nthreads - 1) ? (m - 1) : (lb + items_per_thread - 1);
-        for (int i = lb; i <= ub; i++)
-        {
+        int k = m % nthreads;
+        int lb = LB(threadid, k, nthreads, m);
+        int ub = LB(threadid + 1, k, nthreads, m);
+
+        printf("Thread %d: LB %d UB %d\n", threadid, lb, ub);
+
+        double local_sum = 0.0;
+        for (int i = lb; i < ub; i++) {
             c[i] = 0.0;
-            for (int j = 0; j < n; j++)
+            for (int j = 0; j < n; j++) {
                 c[i] += a[i * n + j] * b[j];
+                // local_sum += c[i]; // Локальная сумма для каждого потока
+            }
         }
+
+        // sum += local_sum; // Обновляем общую сумму с использованием механизма редукции
     }
+    // printf("\nTotal sum: %lf\n", sum); // Выводим общую сумму только один раз
+
+    return sum;
 }
+
+
 
 void run_serial(size_t n, size_t m)
 {
