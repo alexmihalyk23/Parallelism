@@ -9,7 +9,7 @@
 
 double e = 0.00001;
 
-int m = 11, n = 11;  
+int m = 4, n = 4;  
 
 char end = 'f';  
 double t = 0.1;  
