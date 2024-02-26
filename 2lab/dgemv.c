@@ -54,6 +54,11 @@ int LB(int i, int k, int n, int size) {
     return lb;
 }
 
+
+
+
+// 0-2 3-5 6-8 9-11
+
 double matrix_vector_product_omp(double *a, double *b, double *c, int m, int n) {
     double sum = 0.0;
 #pragma omp parallel // Используем механизм редукции для корректного подсчета общей суммы
@@ -67,7 +72,8 @@ double matrix_vector_product_omp(double *a, double *b, double *c, int m, int n) 
         printf("Thread %d: LB %d UB %d\n", threadid, lb, ub);
 
         double local_sum = 0.0;
-        for (int i = lb; i < ub; i++) {
+        // #pragma omp for
+        for (int i = 0; i < m; i++) {
             c[i] = 0.0;
             for (int j = 0; j < n; j++) {
                 c[i] += a[i * n + j] * b[j];
