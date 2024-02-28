@@ -69,11 +69,11 @@ double matrix_vector_product_omp(double *a, double *b, double *c, int m, int n) 
         int lb = LB(threadid, k, nthreads, m);
         int ub = LB(threadid + 1, k, nthreads, m);
 
-        printf("Thread %d: LB %d UB %d\n", threadid, lb, ub);
+        // printf("Thread %d: LB %d UB %d\n", threadid, lb, ub);
 
         double local_sum = 0.0;
         // #pragma omp for
-        for (int i = 0; i < m; i++) {
+        for (int i = lb; i <= ub; i++) {
             c[i] = 0.0;
             for (int j = 0; j < n; j++) {
                 c[i] += a[i * n + j] * b[j];

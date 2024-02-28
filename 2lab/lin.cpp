@@ -1,4 +1,4 @@
-#include <stdio.h>
+
 #include <stdlib.h>
 #include <time.h>
 #include <omp.h>
@@ -115,7 +115,7 @@ void run_parallel(std::vector<std::vector<double>>A, std::vector<double>b, int n
     double bhgv = 0;
 
     double time = cpuSecond();
-#pragma omp parallel num_threads(numThread)
+#pragma omp parallel reduction num_threads(numThread)
     {
 
         #pragma omp for
@@ -123,7 +123,7 @@ void run_parallel(std::vector<std::vector<double>>A, std::vector<double>b, int n
             A[i][i] = 2;
             //b[i] = n+1;
             x[i] = b[i] / A[i][i];
-#pragma omp atomic
+// #pragma omp atomic
             bhgv += b[i] * b[i];
         }
     }
@@ -159,5 +159,6 @@ int main(int argc, char** argv) {
     }
     std::vector<std::vector<double>>A(m, std::vector<double>(n, 1));
     std::vector<double>b(n, n + 1);
+    // run_parallel(A, b, 1);
     run_parallel(A, b, numThread);
 }
