@@ -46,8 +46,8 @@ double integrate_omp(double (*func)(double), double a, double b, int n)
         int items_per_thread = n / nthreads;
         int additional_items = n % nthreads;
 
-        int lb = threadid * items_per_thread + (threadid < additional_items ? threadid : additional_items);
-        int ub = lb + items_per_thread + (threadid < additional_items ? 1 : 0) - 1;
+        // int lb = threadid * items_per_thread + (threadid < additional_items ? threadid : additional_items);
+        // int ub = lb + items_per_thread + (threadid < additional_items ? 1 : 0) - 1;
 //         int lb = threadid * items_per_thread + MIN(threadid, n % nthreads);
 // int ub = (threadid + 1) * items_per_thread + MIN(threadid + 1, n % nthreads) - 1;
         // int lb = threadid * items_per_thread + (n % nthreads < threadid ? n % nthreads : 0);
@@ -59,7 +59,8 @@ double integrate_omp(double (*func)(double), double a, double b, int n)
         // int lb = threadid * items_per_thread;
         // int ub = (threadid == nthreads - 1) ? (n - 1) : (lb + items_per_thread - 1);
         double sumloc =0.0;
-        for (int i = lb; i <= ub; i++){
+        #pragma omp for
+        for (int i = 0; i < n; i++){
             // sum for each thread
             sumloc += func(a + h * (i + 0.5));
             
