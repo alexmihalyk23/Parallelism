@@ -194,7 +194,7 @@ void run_parallel(long long N) {
 }
 
 int main(int argc, char **argv) {
-    std::cout.precision(10);
+    
     size_t SIZE = 1000;
     
     
