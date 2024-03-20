@@ -180,7 +180,7 @@ void run_parallel(long long N) {
     linear_equation_omp_1(A, b, x, N);
     double t1 = omp_get_wtime();
 
-    std::cout << "\nThis was a parallel version 1: " << t1 - t << '\n' << std::endl;
+    std::cout << "\nparallel version 1: " << t1 - t << '\n' << std::endl;
 
     for (int i = 0; i < N; i++) {
         x[i] = 0;
@@ -190,7 +190,7 @@ void run_parallel(long long N) {
     linear_equation_omp_2(A, b, x, N);
     t1 = omp_get_wtime();
 
-    std::cout << "\nThis was a parallel version 2: " << t1 - t << '\n' << std::endl;
+    std::cout << "\nparallel version 2: " << t1 - t << '\n' << std::endl;
 }
 
 int main(int argc, char **argv) {
