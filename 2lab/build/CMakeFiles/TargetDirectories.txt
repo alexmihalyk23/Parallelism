@@ -1,3 +1,0 @@
-/home/alex/Parallelism/2lab/build/CMakeFiles/Parallels_C__.dir
-/home/alex/Parallelism/2lab/build/CMakeFiles/edit_cache.dir
-/home/alex/Parallelism/2lab/build/CMakeFiles/rebuild_cache.dir
