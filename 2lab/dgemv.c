@@ -43,10 +43,12 @@ double run_serial(int m, int n)
 	free(c);
 	return t;
 }
-
+// 3 2 3 11
 int LB(int i, int k, int n, int size) {
+
     int lb = 0;
     if (i < k) {
+    	// 4
         lb = i * ((size / n)+1);
     } else {
         lb = k * ((size / n)+1) + (i - k) * (size / n);
@@ -56,24 +58,45 @@ int LB(int i, int k, int n, int size) {
 
 
 
+// 0-2 3-5 6-10
 
-// 0-2 3-5 6-8 9-11
+// 3 3 5
+
+// 4 4 3
+
 
 double matrix_vector_product_omp(double *a, double *b, double *c, int m, int n) {
     double sum = 0.0;
 #pragma omp parallel // Используем механизм редукции для корректного подсчета общей суммы
+
+
+    // 
     {
+    	// 2 потока
         int nthreads = omp_get_num_threads();
+        // 0 1
         int threadid = omp_get_thread_num();
+
+        //  m= 11 ntrherads = 3
+        // 11 % 3 = 2
+        // threadid = 0
+        //  k = 2
         int k = m % nthreads;
+        // 1 2 3 11
         int lb = LB(threadid, k, nthreads, m);
+        // lb = 0 
+        // ub = 4 4
+        // lb = 4 
+        // ub = 8 4 
+        // lb = 8
+        // ub = 11 3
         int ub = LB(threadid + 1, k, nthreads, m);
 
-        // printf("Thread %d: LB %d UB %d\n", threadid, lb, ub);
+        printf("Thread %d: LB %d UB %d\n", threadid, lb, ub);
 
         double local_sum = 0.0;
         // #pragma omp for
-        for (int i = lb; i <= ub; i++) {
+        for (int i = lb; i <ub; i++) {
             c[i] = 0.0;
             for (int j = 0; j < n; j++) {
                 c[i] += a[i * n + j] * b[j];

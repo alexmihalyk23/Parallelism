@@ -1,164 +1,208 @@
-
-#include <stdlib.h>
-#include <time.h>
-#include <omp.h>
 #include <iostream>
-#include <cmath>
+#include <omp.h>
 #include <vector>
-#include <malloc.h>
 
-double e = 0.00001;
+using namespace std;
+const double tau = 0.00001;
 
-int m = 4, n = 4;  
+bool flag = false;
 
-char end = 'f';  
-double t = 0.1;  
+double ProductOfMatrix(double* A, double* x, int index, long long N) {
+    double sum = 0;
 
-double loss = 0;
-int parallel_loop = 0;
+    for (int k = 0; k < N; k++) {
+        sum += A[index * N + k] * x[k];
+    }
 
-double cpuSecond()
-{
-    struct timespec ts;
-    timespec_get(&ts, TIME_UTC);
-    return ((double)ts.tv_sec + (double)ts.tv_nsec * 1.e-9);
+//    cout << sum << endl;
+
+    return sum;
 }
 
-int t_flag = 0;
+void linear_equation(double* A, double* b, double* x, long long N) {
+    double sum_2 = 0;
 
-void test(std::vector<double>x, int numThread, double bhg, double bhgv) {
-    {
-        int sm = 0;
-        double r = sqrt(bhg) / sqrt(bhgv);
-        if (loss < r && loss != 0 && loss > 0.999999999)
-        {
-            t = t / 10;
-            t_flag = 1;
-            // printf("first %f %f\n", loss, t);
-            loss = 0;
-            x.assign(x.size(), 0);
+    for (int i = 0; i < N; i++) {
+        sum_2 += b[i] * b[i];
+    }
+
+    int index = 0;
+    for (int k = 0; ; k++) {
+        index++;
+        double sum, sum_1 = 0;
+
+        double *arg = new double[N];
+        for (int j = 0; j < N; j++) {
+            sum = ProductOfMatrix(A, x, j, N);
+            sum_1 += (sum - b[j]) * (sum - b[j]);
+            arg[j] = tau * (sum - b[j]);
         }
-        else {
-            if (abs(loss - r) < 0.00001 && sm == 0) {
-                t = t * -1;
-                sm = 1;
-            }
-            // printf(" second %f %f\n", loss, t);
-            loss = r;
-            if (r < e) end = 't';
+
+        for (int j = 0; j < N; j++) {
+            x[j] -= arg[j];
+        }
+
+        if (sum_1 / sum_2 < 0.000000001) {
+            break;
         }
     }
+
+    cout << x[0] << endl;
 }
 
+void linear_equation_omp_1(double* A, double* b, double* x, long long N) {
+    double sum_1;
+    double sum_2 = 0;
 
-
-std::vector<double> matrix_vector_product_omp(std::vector<std::vector<double>>A, std::vector<double>b, std::vector<double>x, int numThread, double bhgv)
-{
-    std::vector<double>x_predict(n, 0);
-    double bhg = 0;
-#pragma omp parallel num_threads(numThread)
+#pragma omp parallel
     {
-        double aaaaaa = 0;
-        #pragma omp for
-        for (int i = 0; i <m; i++) {
-            x_predict[i] = 0;
-            for (int j = 0; j < n; j++) {
-                x_predict[i] = x_predict[i] + A[i][j] * x[j];
-            }
-            x_predict[i] = x_predict[i] - b[i];
-            aaaaaa += x_predict[i] * x_predict[i];
-            x_predict[i] = x[i] - t * x_predict[i];
+        double sum_22 = 0;
+#pragma omp for schedule(guided, 100) nowait
+        for (int j = 0; j < N; j++) {
+            sum_22 += b[j] * b[j];
         }
+
 #pragma omp atomic
-        bhg += aaaaaa;
+        sum_2 += sum_22;
     }
-    //printf("%f\n", x_predict[0]);
-    test(x, numThread, bhg, bhgv);
-    if (t_flag == 1) {
-        x_predict = x;
-        t_flag = 0;
-    }
-    return x_predict;
-}
 
+    double *arr = new double[N];
 
-std::vector<double> matrix_vector_product_omp_second(std::vector<std::vector<double>>A, std::vector<double>b, std::vector<double>x, int numThread, double bhgv)
-{
-    std::vector<double>x_predict(n, 0);
-    double bhg = 0;
-#pragma omp parallel num_threads(numThread)
-    {
+    for (int k = 0; ; k++){
+        for (int i = 0; i < N; i++) {
+            arr[i] = 0;
+        }
 
-#pragma omp for schedule(dynamic, int(m/(numThread*3))) nowait reduction(+:bhg)
-        for (int i = 0; i < m; i++) {
-            x_predict[i] = 0;
-            for (int j = 0; j < n; j++) {
-                x_predict[i] = x_predict[i] + A[i][j] * x[j];
+        sum_1 = 0;
+
+#pragma omp parallel
+        {
+#pragma omp for schedule(guided, 100)
+            for (int i = 0; i < N; i++) {
+                for (int j = 0; j < N; j++) {
+                    arr[i] += A[i * N + j] * x[j];
+                }
             }
-            x_predict[i] = x_predict[i] - b[i];
-            bhg += x_predict[i] * x_predict[i];
-            x_predict[i] = x[i] - t * x_predict[i];
+
+#pragma omp for schedule(guided, 100) reduction(+:sum_1)
+            for (int i = 0; i < N; i++) {
+                sum_1 += (arr[i] - b[i]) * (arr[i] - b[i]);
+                x[i] -= tau * (arr[i] - b[i]);
+            }
+        }
+
+        if (sum_1 / sum_2 < 0.000000001) {
+            break;
         }
     }
 
-    test(x, numThread, bhg, bhgv);
-    if (t_flag == 1) {
-        x_predict = x;
-        t_flag = 0;
-    }
-    return x_predict;
+    cout << x[0] << endl;
 }
 
-void run_parallel(std::vector<std::vector<double>>A, std::vector<double>b, int numThread)
-{
-    std::vector<double>x(n, 0);
-    double bhgv = 0;
-
-    double time = cpuSecond();
-#pragma omp parallel reduction num_threads(numThread)
+void linear_equation_omp_2(double* A, double* b, double* x, long long N) {
+    double sum_1;
+    double sum_2 = 0;
+#pragma omp parallel
     {
-
-        #pragma omp for
-        for (int i = 0; i <m; i++) {
-            A[i][i] = 2;
-            //b[i] = n+1;
-            x[i] = b[i] / A[i][i];
-// #pragma omp atomic
-            bhgv += b[i] * b[i];
-        }
-    }
-    if (parallel_loop == 0) {
-        while (end == 'f') {
-            x = matrix_vector_product_omp(A, b, x, numThread, bhgv);
-        }
-    }
-    else {
-        while (end == 'f') {
-            x = matrix_vector_product_omp_second(A, b, x, numThread, bhgv);
+#pragma omp for schedule(guided, 100) reduction(+:sum_2) nowait
+        for (int j = 0; j < N; j++) {
+            sum_2 += b[j] * b[j];
         }
     }
 
-    //for (int i = 0; i < n; i++) {
-    //    printf("%f ", x[i]);    
-    //}
-    time = cpuSecond() - time; 
+    double *arr = new double[N];
 
-    printf("Elapsed time (parallel): %.6f sec.\n", time);
+#pragma omp parallel
+    {
+        for (int k = 0; ; k++) {
+#pragma omp for schedule(guided, 100)
+            for (int i = 0; i < N; i++) {
+                arr[i] = 0;
+                for (int j = 0; j < N; j++) {
+                    arr[i] += A[i * N + j] * x[j];
+                }
+            }
+
+            sum_1 = 0;
+#pragma omp for schedule(guided, 100) reduction(+:sum_1)
+            for (int i = 0; i < N; i++) {
+                sum_1 += (arr[i] - b[i]) * (arr[i] - b[i]);
+                x[i] -= tau * (arr[i] - b[i]);
+            }
+
+            if (sum_1 / sum_2 < 0.000000001) {
+                break;
+            }
+        }
+    }
+
+    cout << x[0] << endl;
 }
 
-int main(int argc, char** argv) {
-    int numThread = 2;
+void run_serial(long long N) {
+    int A_size = N*N;
+    double* A = new double[N*N];
+    double* b = new double[N];
+    double* x = new double[N];
+
+    for (int i = 0; i < A_size; i++) {
+        A[i] = ((i % N == i / N)? 2.0: 1.0);
+    }
+
+    for (int i = 0; i < N; i++) {
+        b[i] = N + 1;
+        x[i] = 0.0;
+    }
+
+    double t = omp_get_wtime();
+    linear_equation(A, b, x, N);
+    double t1 = omp_get_wtime();
+
+    std::cout << "This was a serial version: " << t1 - t << std::endl;
+}
+
+void run_parallel(long long N) {
+    int A_size = N*N;
+    double* A = new double[N * N];
+    double* b = new double[N];
+    double* x = new double[N];
+
+    for (int i = 0; i < A_size; i++) {
+        A[i] = ((i % N == i / N)? 2.0: 1.0);
+    }
+
+    for (int i = 0; i < N; i++) {
+        b[i] = N + 1;
+        x[i] = 0.0;
+    }
+
+    double t = omp_get_wtime();
+    linear_equation_omp_1(A, b, x, N);
+    double t1 = omp_get_wtime();
+
+    std::cout << "\nThis was a parallel version 1: " << t1 - t << '\n' << std::endl;
+
+    for (int i = 0; i < N; i++) {
+        x[i] = 0;
+    }
+
+    t = omp_get_wtime();
+    linear_equation_omp_2(A, b, x, N);
+    t1 = omp_get_wtime();
+
+    std::cout << "\nThis was a parallel version 2: " << t1 - t << '\n' << std::endl;
+}
+
+int main(int argc, char **argv) {
+    std::cout.precision(10);
+    size_t SIZE = 1000;
+    
+    
     if (argc > 1)
-        numThread = atoi(argv[1]);
-    if (argc > 2) {
-        m = atoi(argv[2]);
-        n = atoi(argv[2]);
-    }
-    if (argc > 3) {
-        parallel_loop = atoi(argv[3]);
-    }
-    std::vector<std::vector<double>>A(m, std::vector<double>(n, 1));
-    std::vector<double>b(n, n + 1);
-    // run_parallel(A, b, 1);
-    run_parallel(A, b, numThread);
+        SIZE = atoi(argv[1]);
+
+    run_parallel(SIZE);
+    run_serial(SIZE);
+
+    return 0;
 }

@@ -1,0 +1,1 @@
+/usr/bin/c++  -fopenmp CMakeFiles/Parallels_C__.dir/lin.cpp.o -o Parallels_C__ 
