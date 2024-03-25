@@ -1,27 +1,23 @@
 #include <iostream>
 #include <future>
 #include <thread>
-#include <math.h>
+#include <cmath>
 #include <queue>
 #include <unordered_map>
 #include <functional>
-#include <list>
 #include <mutex>
 #include <condition_variable>
 #include <random>
-#include <cmath> // Для std::sin
 
 #define Type double
 
 using namespace std;
-std::condition_variable cv;
-
 
 mutex mut;
+condition_variable cv;
 
 queue<pair<size_t, future<Type>>> tasks;
-
-unordered_map<int, Type> results;
+unordered_map<size_t, Type> results;
 
 void server_thread(const stop_token& stoken)
 {
@@ -40,8 +36,6 @@ void server_thread(const stop_token& stoken)
 
         cv.notify_one();
         lock_res.unlock();
-
-        // this_thread::sleep_for(chrono::milliseconds(50));
     }
 
     cout << "Server stop!\n";
@@ -63,23 +57,23 @@ public:
     };
 
     size_t add_task(future<T> task) {
-        size_t id = rand;
+        size_t id = rand();
         tasks.push({id, std::move(task)});
-        rand++;
-
         return id;
     };
 
     T request_result(size_t id_res) {
         T res = results[id_res];
-
         results.erase(id_res);
-
         return res;
     };
 
 private:
-    size_t rand = 0;
+    size_t rand() {
+        static size_t counter = 0;
+        return counter++;
+    }
+
     jthread server;
 };
 
@@ -138,8 +132,6 @@ void add_task_1() {
             lock_res.unlock();
         }
 
-        // this_thread::sleep_for(chrono::milliseconds(50));
-
         ready_task = false;
     }
 }
@@ -173,8 +165,6 @@ void add_task_2() {
             lock_res.unlock();
         }
 
-        // this_thread::sleep_for(chrono::milliseconds(50));
-
         ready_task = false;
     }
 }
@@ -207,8 +197,6 @@ void add_task_3() {
 
             lock_res.unlock();
         }
-
-        // this_thread::sleep_for(chrono::milliseconds(50));
 
         ready_task = false;
     }
