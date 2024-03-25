@@ -53,14 +53,14 @@ void linear_equation_omp_1(double* A, double* b, double* x, long long N) {
 
 #pragma omp parallel
     {
-        double sum_22 = 0;
+        double sum_lc = 0;
 #pragma omp for schedule(guided, 100) nowait
         for (int j = 0; j < N; j++) {
-            sum_22 += b[j] * b[j];
+            sum_lc += b[j] * b[j];
         }
 
 #pragma omp atomic
-        sum_2 += sum_22;
+        sum_2 += sum_lc;
     }
 
     double* arr = new double[N];
