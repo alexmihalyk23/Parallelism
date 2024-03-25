@@ -1,162 +1,214 @@
- #include <iostream>
-#include <thread>
-#include <list>
-#include <mutex>
-#include <queue>
+#include <iostream>
 #include <future>
-#include <functional>
-#include <condition_variable>
-#include <random>
-#include <cmath> // Для std::sin
+#include <thread>
+#include <math.h>
+#include <queue>
 #include <unordered_map>
 
-template <typename T>
-class TaskServer
+#define Type double
+
+using namespace std;
+std::condition_variable cv;
+
+
+mutex mut;
+
+queue<pair<size_t, future<Type>>> tasks;
+
+unordered_map<int, Type> results;
+
+void server_thread(const stop_token& stoken)
 {
-public:
-    void start()
+    unique_lock lock_res{mut, defer_lock};
+    size_t id_task;
+
+    while (!stoken.stop_requested())
     {
-        stop_flag_ = false;
-        server_thread_ = std::thread(&TaskServer::server_thread, this);
-    }
-    void stop()
-    {
-        {
-            std::unique_lock<std::mutex> lock(mutex_);
-            stop_flag_ = true;
-            cv_.notify_one(); // Уведомляем поток сервера, чтобы он проснулся
+        lock_res.lock();
+
+        while (!tasks.empty()) {
+            id_task = tasks.front().first;
+            results.insert({id_task, tasks.front().second.get()});
+            tasks.pop();
         }
-        server_thread_.join();
-    }
-    size_t add_task(std::function<T()> task)
-    {
-        std::unique_lock<std::mutex> lock(mutex_);
-        // tasks_.push({ ++next_id_, std::async(std::launch::deferred, task) });
-        std::future<double> result = std::async(std::launch::deferred,task);
-        // lock.unlock();
-        // lock.lock();
-        ++next_id_;
-        tasks_.push({ next_id_,std::move(result) });
-        cv_.notify_one();
-        // lock.unlock();x
-        return tasks_.back().first;
-    }
-    T request_result(size_t id)
-    {
-        std::unique_lock<std::mutex> lock(mutex_);
-        cv_.wait(lock, [this, id]() { return results_.find(id) != results_.end(); });
-        T result = results_[id];
-        results_.erase(id); // удаляется результат из контейнера после того как его вытащили
-        return result;
+
+        cv.notify_one();
+        lock_res.unlock();
+
+        // this_thread::sleep_for(chrono::milliseconds(50));
     }
 
-private:
-    std::mutex mutex_;
-    std::condition_variable cv_;
-    std::thread server_thread_;
-    bool stop_flag_ = false;
-    size_t next_id_ = 1;
-    //очередь задач, первая переменная в паре это индификатор задачи, вторая объект результата задачи 
-    std::queue<std::pair<size_t, std::future<T>>> tasks_;
-    std::unordered_map<size_t, T> results_;
-
-    void server_thread() {
-        while (true) {
-            std::unique_lock<std::mutex> lock(mutex_); // блокировщик
-            cv_.wait(lock, [this]() { return !tasks_.empty() || stop_flag_; }); // ожидает сообщения держа блокировщик открытым
-            if (tasks_.empty() && stop_flag_) {
-                lock.unlock();
-                break; // Выход из цикла, если нет задач и флаг stop_flag_ установлен
-            }
-            if (!tasks_.empty()) {
-                auto task = std::move(tasks_.front()); // извлекаем задачу из очереди
-                tasks_.pop(); // удаляется задача из очереди
-                results_[task.first] = task.second.get(); //ответ для задачи которую вытащили записывается в results_ по её ключу
-                cv_.notify_one(); // оповещеает один поток о том что задача готова
-            }
-        }
-    }
-};
-
-template <typename T>
-class TaskClient {
-public:
-    void run_client(TaskServer<T>& server, std::function<T()> task_generator) {
-        int id = server.add_task(task_generator);
-        task_ids_.push_back(id);
-    }
-
-    std::list<T> client_to_result(TaskServer<T>& server) {
-        std::list<T> results;
-        for (int id : task_ids_) {
-            T result = server.request_result(id);
-            results.push_back(result);
-        }
-        return results;
-    }
-
-private:
-    std::vector<int> task_ids_;
-};
-
-template<typename T>
-T fun_random() {
-    static std::default_random_engine generator;
-    static std::uniform_real_distribution<T> distribution(1.0, 10.0);
-    return distribution(generator);
+    cout << "Server stop!\n";
 }
 
 template<typename T>
-T fun_random_sqrt() {
-    static std::default_random_engine generator;
-    static std::uniform_real_distribution<T> distribution(1.0, 10.0);
-    T value = distribution(generator);
-    return std::sqrt(value);
+class Server{
+public:
+    void start() {
+        cout << "Start\n";
+        server = jthread(server_thread);
+    };
+
+    void stop() {
+        server.request_stop();
+        server.join();
+
+        cout << "End\n";
+    };
+
+    size_t add_task(future<T> task) {
+        size_t id = rand;
+        tasks.push({id, std::move(task)});
+        rand++;
+
+        return id;
+    };
+
+    T request_result(size_t id_res) {
+        T res = results[id_res];
+
+        results.erase(id_res);
+
+        return res;
+    };
+
+private:
+    size_t rand = 0;
+    jthread server;
+};
+
+Server<Type> server;
+
+template<typename T>
+T fun_sin(T arg) {
+    return sin(arg);
 }
 
 template<typename T>
-T fun_random_pow() {
-    static std::default_random_engine generator;
-    static std::uniform_real_distribution<T> distribution(1.0, 10.0);
-    T value = distribution(generator);
-    return std::pow(value, 2.0);
+T fun_sqrt(T arg) {
+    return sqrt(arg);
+}
+
+template<typename T>
+T fun_pow(T x, T y) {
+    return pow(x, y);
+}
+
+template<typename T>
+void add_task_1() {
+    bool ready_task = false;
+
+    unique_lock lock_res(mut, defer_lock);
+
+    for (int i = 0; i < 10000; i++) {
+        future<T> result = async(launch::deferred, [](){return fun_sin<T>(numbers::pi/2);});
+
+        lock_res.lock();
+
+        if(tasks.empty()){
+            cv.wait(lock_res);
+        }
+        size_t id = server.add_task(std::move(result));
+
+        lock_res.unlock();
+
+        while (!ready_task) {
+            lock_res.lock();
+
+            if (results.find(id) != results.end()) {
+                // cout << "task_thread result:\t" << server.request_result(id) << endl;
+                ready_task = true;
+            }
+
+            lock_res.unlock();
+        }
+
+        // this_thread::sleep_for(chrono::milliseconds(50));
+
+        ready_task = false;
+    }
+}
+
+template<typename T>
+void add_task_2() {
+    bool ready_task = false;
+
+    unique_lock lock_res(mut, defer_lock);
+
+    for (int i = 0; i < 10000; i++) {
+        future<T> result = async(launch::deferred, [](){return fun_sqrt<T>(4);});
+
+        lock_res.lock();
+        if(tasks.empty()){
+            cv.wait(lock_res);
+        }
+
+        size_t id = server.add_task(std::move(result));
+
+        lock_res.unlock();
+
+        while (!ready_task) {
+            lock_res.lock();
+
+            if (results.find(id) != results.end()) {
+                // cout << "task_thread result:\t" << server.request_result(id) << endl;
+                ready_task = true;
+            }
+
+            lock_res.unlock();
+        }
+
+        // this_thread::sleep_for(chrono::milliseconds(50));
+
+        ready_task = false;
+    }
+}
+
+template<typename T>
+void add_task_3() {
+    bool ready_task = false;
+
+    unique_lock lock_res(mut, defer_lock);
+
+    for (int i = 0; i < 10000; i++) {
+        future<T> result = async(launch::deferred, [](){return fun_pow<T>(2, 3);});
+
+        lock_res.lock();
+        if(tasks.empty()){
+            cv.wait(lock_res);
+        }
+
+        size_t id = server.add_task(std::move(result));
+
+        lock_res.unlock();
+
+        while (!ready_task) {
+            lock_res.lock();
+
+            if (results.find(id) != results.end()) {
+                // cout << "task_thread result:\t" << server.request_result(id) << endl;
+                ready_task = true;
+            }
+
+            lock_res.unlock();
+        }
+
+        // this_thread::sleep_for(chrono::milliseconds(50));
+
+        ready_task = false;
+    }
 }
 
 int main() {
-    TaskServer<double> server; // Уточняем тип double
     server.start();
 
-    TaskClient<double> client1;
-    TaskClient<double> client2;
-    TaskClient<double> client3;
+    thread task_1(add_task_1<Type>);
+    thread task_2(add_task_2<Type>);
+    thread task_3(add_task_3<Type>);
 
-    for (int i = 0; i < 10; ++i) {
-        client1.run_client(server, fun_random<double>);
-        client2.run_client(server, fun_random_sqrt<double>);
-        client3.run_client(server, fun_random_pow<double>);
-    }
-
-
-    std::list<double> t1 = client1.client_to_result(server);
-    std::list<double> t2 = client2.client_to_result(server);
-    std::list<double> t3 = client3.client_to_result(server);
-
-    std::cout << "t1: ";
-    for (double n : t1)
-        std::cout << n << ", ";
-    std::cout << "\n";
-
-    std::cout << "t2: ";
-    for (double n : t2)
-        std::cout << n << ", ";
-    std::cout << "\n";
-
-    std::cout << "t3: ";
-    for (double n : t3)
-        std::cout << n << ", ";
-    std::cout << "\n";
+    task_1.join();
+    task_2.join();
+    task_3.join();
 
     server.stop();
-
-    return 0;
 }

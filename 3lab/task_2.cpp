@@ -1,129 +1,229 @@
-
 #include <iostream>
-#include <queue>
 #include <future>
 #include <thread>
-#include <chrono>
-#include <cmath>
+#include <math.h>
+#include <queue>
+#include <unordered_map>
 #include <functional>
+#include <list>
 #include <mutex>
+#include <condition_variable>
+#include <random>
+#include <cmath> // Для std::sin
 
-std::mutex mut;
+#define Type double
+
+using namespace std;
 std::condition_variable cv;
 
 
-// Очередь задач
-std::queue<std::pair<size_t, std::future<int>>> tasks;
+mutex mut;
 
-// Результаты
-std::unordered_map<int, int> results;
+queue<pair<size_t, future<Type>>> tasks;
 
-// задача
-int pow_func(int x, int y)
+unordered_map<int, Type> results;
+
+void server_thread(const stop_token& stoken)
 {
-
-    return std::pow(x, y);
-}
-int sin_func(int x)
-{
-
-    return std::sin(x);
-}
-int sqrt_func(int x)
-{
-
-    return std::sqrt(x);
-}
-
-// пример сервера обрабатывающего задачи из очереди
-void server_thread(std::stop_token stoken)
-{
-    std::unique_lock lock_res{mut, std::defer_lock};
+    unique_lock lock_res{mut, defer_lock};
     size_t id_task;
-    // пока не получили сигнал стоп
+
     while (!stoken.stop_requested())
     {
         lock_res.lock();
-        // если очередь не пуста, то достаем и решаем задчу
-        if (!tasks.empty())
-        {
-            id_task = tasks.back().first;
-            results.insert({id_task, tasks.back().second.get()});
+
+        while (!tasks.empty()) {
+            id_task = tasks.front().first;
+            results.insert({id_task, tasks.front().second.get()});
             tasks.pop();
         }
+
         cv.notify_one();
         lock_res.unlock();
-        // спим, чтобы не занимать одно ядро целиком
-        // можно использовать std::condition_variable
-        // std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+        // this_thread::sleep_for(chrono::milliseconds(50));
     }
 
-    std::cout << "Server stop!\n";
+    cout << "Server stop!\n";
 }
 
-// Пример потока добавляющего задачи
-// Обратите внимание на метод emplace() в std::queue, для конструирования на месте
-void add_task_thread()
-{
-    // id задачи
-    size_t id_task = 1;
+template<typename T>
+class Server{
+public:
+    void start() {
+        cout << "Start\n";
+        server = jthread(server_thread);
+    };
 
-    // блокировщик для работы с общими данными
-    std::unique_lock lock_res{mut, std::defer_lock};
+    void stop() {
+        server.request_stop();
+        server.join();
 
-    // создаем задачу (ленивое выполнение)
-    std::future<int> result = std::async(std::launch::deferred,
-                                         []() -> int
-                                         {
-                                             return sqrt_func(100);
-                                         });
+        cout << "End\n";
+    };
 
-    // добавляем задачу в очередь
-    lock_res.lock();
+    size_t add_task(future<T> task) {
+        size_t id = rand;
+        tasks.push({id, std::move(task)});
+        rand++;
 
-    if(tasks.empty()){
-        cv.wait(lock_res);
-    }
-    ++id_task;
-    tasks.push({id_task, std::move(result)});
-    lock_res.unlock();
+        return id;
+    };
 
-    // cv.notify_one();
+    T request_result(size_t id_res) {
+        T res = results[id_res];
 
+        results.erase(id_res);
 
-    // ожидаем завершения задачи и выходим
-    bool ready_result = false;
-    while (!ready_result)
-    {
+        return res;
+    };
+
+private:
+    size_t rand = 0;
+    jthread server;
+};
+
+Server<Type> server;
+
+template<typename T>
+T fun_sin() {
+    static std::default_random_engine generator;
+    static std::uniform_real_distribution<T> distribution(-3.14159, 3.14159);
+    T x = distribution(generator);
+    return sin(x);
+}
+
+template<typename T>
+T fun_sqrt() {
+    static std::default_random_engine generator;
+    static std::uniform_real_distribution<T> distribution(1.0, 10.0);
+    T value = distribution(generator);
+    return std::sqrt(value);
+}
+
+template<typename T>
+T fun_pow() {
+    static std::default_random_engine generator;
+    static std::uniform_real_distribution<T> distribution(1.0, 10.0);
+    T value = distribution(generator);
+    return std::pow(value, 2.0);
+}
+
+template<typename T>
+void add_task_1() {
+    bool ready_task = false;
+
+    unique_lock lock_res(mut, defer_lock);
+
+    for (int i = 0; i < 10000; i++) {
+        future<T> result = async(launch::deferred, [](){return fun_sin<T>();});
+
         lock_res.lock();
-        // если есть результат задачи, c id_tasks, то печатаем?
-        if (results.find(id_task) != results.end())
-        {
-            std::cout << "task_thread result:\t" << results[id_task] << '\n';
-            results.erase(id_task);
-            ready_result = true;
-            // std::cout << "true" << '\n';
+
+        if(tasks.empty()){
+            cv.wait(lock_res);
         }
+        size_t id = server.add_task(std::move(result));
+
         lock_res.unlock();
 
+        while (!ready_task) {
+            lock_res.lock();
 
-        // ready_result = true;
-        
-        // спим, чтобы не занимать одно ядро целиком
-        // можно использовать std::condition_variable
-        // std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            if (results.find(id) != results.end()) {
+                cout << "task_thread result(sin):\t" << server.request_result(id) << endl;
+                ready_task = true;
+            }
+
+            lock_res.unlock();
+        }
+
+        // this_thread::sleep_for(chrono::milliseconds(50));
+
+        ready_task = false;
     }
 }
 
-int main()
-{
-    std::cout << "Start\n";
+template<typename T>
+void add_task_2() {
+    bool ready_task = false;
 
-    std::jthread server(server_thread);
-    std::thread add_task(add_task_thread);
+    unique_lock lock_res(mut, defer_lock);
 
-    add_task.join();
-    server.request_stop();
-    server.join();
-    std::cout << "End\n";
+    for (int i = 0; i < 10000; i++) {
+        future<T> result = async(launch::deferred, [](){return fun_sqrt<T>();});
+
+        lock_res.lock();
+        if(tasks.empty()){
+            cv.wait(lock_res);
+        }
+
+        size_t id = server.add_task(std::move(result));
+
+        lock_res.unlock();
+
+        while (!ready_task) {
+            lock_res.lock();
+
+            if (results.find(id) != results.end()) {
+                cout << "task_thread result(sqrt):\t" << server.request_result(id) << endl;
+                ready_task = true;
+            }
+
+            lock_res.unlock();
+        }
+
+        // this_thread::sleep_for(chrono::milliseconds(50));
+
+        ready_task = false;
+    }
+}
+
+template<typename T>
+void add_task_3() {
+    bool ready_task = false;
+
+    unique_lock lock_res(mut, defer_lock);
+
+    for (int i = 0; i < 10000; i++) {
+        future<T> result = async(launch::deferred, [](){return fun_pow<T>();});
+
+        lock_res.lock();
+        if(tasks.empty()){
+            cv.wait(lock_res);
+        }
+
+        size_t id = server.add_task(std::move(result));
+
+        lock_res.unlock();
+
+        while (!ready_task) {
+            lock_res.lock();
+
+            if (results.find(id) != results.end()) {
+                cout << "task_thread result(pow):\t" << server.request_result(id) << endl;
+                ready_task = true;
+            }
+
+            lock_res.unlock();
+        }
+
+        // this_thread::sleep_for(chrono::milliseconds(50));
+
+        ready_task = false;
+    }
+}
+
+int main() {
+    server.start();
+
+    thread task_1(add_task_1<Type>);
+    thread task_2(add_task_2<Type>);
+    thread task_3(add_task_3<Type>);
+
+    task_1.join();
+    task_2.join();
+    task_3.join();
+
+    server.stop();
 }
