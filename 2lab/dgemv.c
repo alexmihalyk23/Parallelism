@@ -95,18 +95,18 @@ double matrix_vector_product_omp(double *a, double *b, double *c, int m, int n) 
         printf("Thread %d: LB %d UB %d\n", threadid, lb, ub);
 
         double local_sum = 0.0;
-        // #pragma omp for
+        #pragma omp for
         for (int i = lb; i <ub; i++) {
             c[i] = 0.0;
             for (int j = 0; j < n; j++) {
                 c[i] += a[i * n + j] * b[j];
-                // local_sum += c[i]; // Локальная сумма для каждого потока
+                local_sum += c[i]; // Локальная сумма для каждого потока
             }
         }
 
-        // sum += local_sum; // Обновляем общую сумму с использованием механизма редукции
+        sum += local_sum; // Обновляем общую сумму с использованием механизма редукции
     }
-    // printf("\nTotal sum: %lf\n", sum); // Выводим общую сумму только один раз
+    printf("\nTotal sum: %lf\n", sum); // Выводим общую сумму только один раз
 
     return sum;
 }
