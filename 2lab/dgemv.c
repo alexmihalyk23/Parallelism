@@ -95,7 +95,7 @@ double matrix_vector_product_omp(double *a, double *b, double *c, int m, int n) 
         printf("Thread %d: LB %d UB %d\n", threadid, lb, ub);
 
         double local_sum = 0.0;
-        #pragma omp for
+        
         for (int i = lb; i <ub; i++) {
             c[i] = 0.0;
             for (int j = 0; j < n; j++) {
