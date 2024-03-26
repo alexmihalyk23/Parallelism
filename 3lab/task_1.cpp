@@ -14,6 +14,19 @@ double cpuSecond()
     return duration_cast<duration<double>>(tp).count();
 }
 
+
+int LB(int i, int k, int n, int size) {
+
+    int lb = 0;
+    if (i < k) {
+        // 4
+        lb = i * ((size / n)+1);
+    } else {
+        lb = k * ((size / n)+1) + (i - k) * (size / n);
+    }
+    return lb;
+}
+
 void matrix_vector_product(double* a, double* b, double* c, int m, int n)
 {
     for (int i = 0; i < m; i++)
@@ -26,9 +39,19 @@ void matrix_vector_product(double* a, double* b, double* c, int m, int n)
 
 void matrix_vector_product_thread(double* a, double* b, double* c, int m, int n, int threadid, int items_per_thread)
 {
-    int lb = threadid * items_per_thread;
-    int ub = (threadid == count - 1) ? (m - 1) : (lb + items_per_thread - 1);
-
+        //  m= 11 ntrherads = 3
+        // 11 % 3 = 2
+        // threadid = 0
+        // 1 2 3 11
+        int lb = LB(threadid, items_per_thread, count, m);
+        // lb = 0 
+        // ub = 4 4
+        // lb = 4 
+        // ub = 8 4 
+        // lb = 8
+        // ub = 11 3
+        int ub = LB(threadid + 1, items_per_thread, count, m);
+        printf("Thread %d: LB %d UB %d\n", threadid, lb, ub);
     for (int i = lb; i <= ub; i++)
     {
         c[i] = 0.0;
@@ -70,7 +93,7 @@ void run_parallel(size_t n, size_t m)
     double t_start = cpuSecond(); // Замеряем время до запуска потоков
 
     std::vector<std::thread> threads;
-    int items_per_thread = m / count;
+    int items_per_thread = m % count;
 
     for (int i = 0; i < count; i++)
     {
