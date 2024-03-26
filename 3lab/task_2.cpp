@@ -128,11 +128,11 @@ void add_task() {
 
         // Once the result is ready, print it
         if (task_type == 0) {
-            cout << "task_thread result(sin):\t" << server.request_result(id) << endl;
+            cout << "id is:" << id << ", task_thread result(sin):\t" << server.request_result(id) << endl;
         } else if (task_type == 1) {
-            cout << "task_thread result(sqrt):\t" << server.request_result(id) << endl;
+            cout << "id is:" << id << ", task_thread result(sqrt):\t" << server.request_result(id) << endl;
         } else {
-            cout << "task_thread result(pow):\t" << server.request_result(id) << endl;
+            cout << "id is:" << id << ", task_thread result(pow):\t" << server.request_result(id) << endl;
         }
 
         ready_task = false;
