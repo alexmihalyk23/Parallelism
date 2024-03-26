@@ -21,7 +21,7 @@ unordered_map<size_t, Type> results;
 
 void server_thread(const stop_token& stoken)
 {
-    unique_lock<mutex> lock_res(mut, defer_lock);
+    unique_lock lock_res{mut, defer_lock};
     size_t id_task;
 
     while (!stoken.stop_requested())
@@ -59,7 +59,6 @@ public:
     size_t add_task(future<T> task) {
         size_t id = rand();
         tasks.push({id, std::move(task)});
-        cv.notify_one(); // Notify the server thread that a new task is available
         return id;
     };
 
@@ -106,8 +105,9 @@ T fun_pow() {
 
 template<typename T>
 void add_task() {
-    unique_lock<mutex> lock_res(mut);
     bool ready_task = false;
+
+    unique_lock lock_res(mut, defer_lock);
 
     for (int i = 0; i < 10000; i++) {
         int task_type = rand() % 3;
@@ -121,18 +121,32 @@ void add_task() {
             result = async(launch::deferred, [](){return fun_pow<T>();});
         }
 
+        lock_res.lock();
+
+        if(tasks.empty()){
+            cv.wait(lock_res);
+        }
         size_t id = server.add_task(std::move(result));
 
-        // Wait for the result to be ready
-        cv.wait(lock_res, [&](){ return results.find(id) != results.end(); });
+        
 
-        // Once the result is ready, print it
-        if (task_type == 0) {
-            cout << "task_thread result(sin):\t" << server.request_result(id) << endl;
-        } else if (task_type == 1) {
-            cout << "task_thread result(sqrt):\t" << server.request_result(id) << endl;
-        } else {
-            cout << "task_thread result(pow):\t" << server.request_result(id) << endl;
+        lock_res.unlock();
+
+        while (!ready_task) {
+            lock_res.lock();
+
+            if (results.find(id) != results.end()) {
+                if (task_type == 0) {
+                    cout << "task_thread result(sin):\t" << server.request_result(id) << endl;
+                } else if (task_type == 1) {
+                    cout << "task_thread result(sqrt):\t" << server.request_result(id) << endl;
+                } else {
+                    cout << "task_thread result(pow):\t" << server.request_result(id) << endl;
+                }
+                ready_task = true;
+            }
+
+            lock_res.unlock();
         }
 
         ready_task = false;
