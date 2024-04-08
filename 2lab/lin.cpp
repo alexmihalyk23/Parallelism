@@ -124,6 +124,7 @@ void linear_equation_omp_2(double* A, double* b, double* x, long long N) {
                 }
             }
 
+
             sum_lc = 0;
 #pragma omp for schedule(guided, 100)
             for (int i = 0; i < N; i++) {
