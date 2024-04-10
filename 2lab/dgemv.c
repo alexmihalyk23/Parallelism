@@ -43,12 +43,12 @@ double run_serial(int m, int n)
 	free(c);
 	return t;
 }
-// 3 2 3 11
+// 1 2 3 11
 int LB(int i, int k, int n, int size) {
 
     int lb = 0;
     if (i < k) {
-    	// 4
+    	//   2* (11/3 +1) = 8
         lb = i * ((size / n)+1);
     } else {
         lb = k * ((size / n)+1) + (i - k) * (size / n);
@@ -72,9 +72,9 @@ double matrix_vector_product_omp(double *a, double *b, double *c, int m, int n) 
 
     // 
     {
-    	// 2 потока
+    	// 3 потока
         int nthreads = omp_get_num_threads();
-        // 0 1
+        // 0 1 2
         int threadid = omp_get_thread_num();
 
         //  m= 11 ntrherads = 3
@@ -82,7 +82,7 @@ double matrix_vector_product_omp(double *a, double *b, double *c, int m, int n) 
         // threadid = 0
         //  k = 2
         int k = m % nthreads;
-        // 1 2 3 11
+             //     1         2      3     11
         int lb = LB(threadid, k, nthreads, m);
         // lb = 0 
         // ub = 4 4
@@ -119,13 +119,15 @@ double *a, *b, *c;
 a = malloc(sizeof(*a) * m * n);
 b = malloc(sizeof(*b) * n);
 c = malloc(sizeof(*c) * m);
+#pragma omp for
 for (int i = 0; i < m; i++) {
 	for (int j = 0; j < n; j++)
 		a[i * n + j] = i + j;
 
 }
+#pragma omp for
 for (int j = 0; j < n; j++)
-b[j] = j;
+    b[j] = j;
 double t = omp_get_wtime();
 matrix_vector_product_omp(a, b, c, m, n);
 t = omp_get_wtime() - t;

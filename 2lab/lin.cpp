@@ -31,12 +31,12 @@ void linear_equation(double* A, double* b, double* x, long long N) {
         double* arg = new double[N];
         for (int j = 0; j < N; j++) {
             sum = ProductOfMatrix(A, x, j, N);
-            sum_1 += (sum - b[j]) * (sum - b[j]);
+            sum_1 += (sum - b[j]) * (sum - b[j]); //числитель
             arg[j] = tau * (sum - b[j]);
         }
 
         for (int j = 0; j < N; j++) {
-            x[j] -= arg[j];
+            x[j] -= arg[j]; // x[j] = x[j] - arg[j]
         }
 
         if (sum_1 / sum_2 < 0.000000001) {
@@ -116,7 +116,8 @@ void linear_equation_omp_2(double* A, double* b, double* x, long long N) {
 
         while (true) {
             sum_1 = 0;
-#pragma omp for schedule(guided, 100)
+
+#pragma omp for schedule(guided, 100) 
             for (int i = 0; i < N; i++) {
                 arr[i] = 0;
                 for (int j = 0; j < N; j++) {
@@ -126,16 +127,18 @@ void linear_equation_omp_2(double* A, double* b, double* x, long long N) {
 
 
             sum_lc = 0;
-#pragma omp for schedule(guided, 100)
+            
+#pragma omp for schedule(guided, 100) 
             for (int i = 0; i < N; i++) {
                 sum_lc += (arr[i] - b[i]) * (arr[i] - b[i]);
                 x[i] -= tau * (arr[i] - b[i]);
             }
 
+
 #pragma omp atomic
             sum_1 += sum_lc;
 
-#pragma omp barrier
+
 
             if (sum_1 / sum_2 < 0.000000001) {
                 break;
