@@ -97,9 +97,10 @@ void run_parallel(size_t n, size_t m)
 
     for (int i = 0; i < count; i++)
     {
+        // в вектор threads записываются результаты вополнения потока, который выполняет matrix_vector_product_thread
         threads.push_back(std::thread(matrix_vector_product_thread, a.get(), b.get(), c.get(), m, n, i, items_per_thread));
     }
-
+    // делаем  join на каждые потоки из вектора threads
     for (auto& thread : threads)
     {
         thread.join();

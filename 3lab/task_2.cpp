@@ -27,14 +27,17 @@ void server_thread(const stop_token& stoken)
     while (!stoken.stop_requested())
     {
         lock_res.lock();
+        if (tasks.empty())
+            cv.wait_for(lock_res, chrono::seconds(1s));
 
         while (!tasks.empty()) {
+
             id_task = tasks.front().first;
             results.insert({id_task, tasks.front().second.get()});
             tasks.pop();
         }
 
-        cv.notify_one();
+        cv.notify_all();
         lock_res.unlock();
     }
 
@@ -59,7 +62,7 @@ public:
     size_t add_task(future<T> task) {
         size_t id = rand();
         tasks.push({id, std::move(task)});
-        cv.notify_one(); // Notify the server thread that a new task is available
+        cv.notify_all();
         return id;
     };
 
@@ -123,10 +126,7 @@ void add_task() {
 
         size_t id = server.add_task(std::move(result));
 
-        // Wait for the result to be ready
         cv.wait(lock_res, [&](){ return results.find(id) != results.end(); });
-
-        // Once the result is ready, print it
         if (task_type == 0) {
             cout << "id is:" << id << ", task_thread result(sin):\t" << server.request_result(id) << endl;
         } else if (task_type == 1) {
