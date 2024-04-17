@@ -28,7 +28,10 @@ void server_thread(const stop_token& stoken)
     {
         lock_res.lock();
         if (tasks.empty())
-            cv.wait_for(lock_res, chrono::seconds(1s));
+            cv.wait(lock_res);
+
+
+        
 
         while (!tasks.empty()) {
 
@@ -36,9 +39,10 @@ void server_thread(const stop_token& stoken)
             results.insert({id_task, tasks.front().second.get()});
             tasks.pop();
         }
-
         cv.notify_all();
         lock_res.unlock();
+
+       
     }
 
     cout << "Server stop!\n";
@@ -53,6 +57,10 @@ public:
     };
 
     void stop() {
+        unique_lock<mutex> lock_res(mut, defer_lock);
+        lock_res.lock();
+        cv.notify_all();
+        lock_res.unlock();
         server.request_stop();
         server.join();
 
@@ -123,17 +131,23 @@ void add_task() {
         } else {
             result = async(launch::deferred, [](){return fun_pow<T>();});
         }
+      
 
         size_t id = server.add_task(std::move(result));
-
+        
         cv.wait(lock_res, [&](){ return results.find(id) != results.end(); });
+
         if (task_type == 0) {
             cout << "id is:" << id << ", task_thread result(sin):\t" << server.request_result(id) << endl;
+            ready_task = true;
         } else if (task_type == 1) {
             cout << "id is:" << id << ", task_thread result(sqrt):\t" << server.request_result(id) << endl;
+            ready_task = true;
         } else {
             cout << "id is:" << id << ", task_thread result(pow):\t" << server.request_result(id) << endl;
+            ready_task = true;
         }
+       
 
         ready_task = false;
     }
@@ -142,9 +156,16 @@ void add_task() {
 int main() {
     server.start();
 
-    thread task(add_task<Type>);
+    thread task1(add_task<Type>);
+    thread task2(add_task<Type>);
+    thread task3(add_task<Type>);
 
-    task.join();
+
+
+
+    task1.join();
+    task2.join();
+    task3.join();
 
     server.stop();
 }
