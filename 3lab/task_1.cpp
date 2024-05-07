@@ -39,20 +39,10 @@ void matrix_vector_product(double* a, double* b, double* c, int m, int n)
 
 void matrix_vector_product_thread(double* a, double* b, double* c, int m, int n, int threadid, int items_per_thread)
 {
-        //  m= 11 ntrherads = 3
-        // 11 % 3 = 2
-        // threadid = 0
-        // 1 2 3 11
         int lb = LB(threadid, items_per_thread, count, m);
-        // lb = 0 
-        // ub = 4 4
-        // lb = 4 
-        // ub = 8 4 
-        // lb = 8
-        // ub = 11 3
         int ub = LB(threadid + 1, items_per_thread, count, m);
         printf("Thread %d: LB %d UB %d\n", threadid, lb, ub);
-    for (int i = lb; i <= ub; i++)
+    for (int i = lb; i < ub; i++)
     {
         c[i] = 0.0;
         for (int j = 0; j < n; j++)

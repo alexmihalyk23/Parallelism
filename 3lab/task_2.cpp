@@ -14,15 +14,18 @@
 using namespace std;
 
 mutex mut;
-condition_variable cv;
+condition_variable cv, cv2;
 
 queue<pair<size_t, future<Type>>> tasks;
+queue<pair<size_t, future<Type>>> get_tasks;
+
 unordered_map<size_t, Type> results;
 
 void server_thread(const stop_token& stoken)
 {
     unique_lock<mutex> lock_res(mut, defer_lock);
     size_t id_task;
+    future<Type> task;
 
     while (!stoken.stop_requested())
     {
@@ -30,17 +33,33 @@ void server_thread(const stop_token& stoken)
         if (tasks.empty())
             cv.wait(lock_res);
 
+        if (!tasks.empty()) {
+            get_tasks.push({tasks.front().first, std::move(tasks.front().second)});
+
+            tasks.pop();
+        }
+
+        lock_res.unlock();
+
 
         
 
-        while (!tasks.empty()) {
+        while (!get_tasks.empty()) {
 
-            id_task = tasks.front().first;
-            results.insert({id_task, tasks.front().second.get()});
-            tasks.pop();
+            id_task = get_tasks.front().first;
+            Type result = get_tasks.front().second.get();
+
+            lock_res.lock();
+
+            results.insert({id_task, result});
+
+            get_tasks.pop();
+
+            cv2.notify_all();
+
+            lock_res.unlock();
         }
-        cv.notify_all();
-        lock_res.unlock();
+
 
        
     }
@@ -70,7 +89,7 @@ public:
     size_t add_task(future<T> task) {
         size_t id = rand();
         tasks.push({id, std::move(task)});
-        cv.notify_all();
+        // cv.notify_all();
         return id;
     };
 
@@ -116,52 +135,53 @@ T fun_pow() {
 }
 
 template<typename T>
-void add_task() {
-    unique_lock<mutex> lock_res(mut);
-    bool ready_task = false;
+void add_tasks() {
+    unique_lock lock_res(mut, defer_lock);
 
     for (int i = 0; i < 10000; i++) {
-        int task_type = rand() % 3;
         future<T> result;
 
-        if (task_type == 0) {
+        if (i % 3 == 0) {
             result = async(launch::deferred, [](){return fun_sin<T>();});
-        } else if (task_type == 1) {
+        } else if (i % 3 == 1) {
             result = async(launch::deferred, [](){return fun_sqrt<T>();});
         } else {
             result = async(launch::deferred, [](){return fun_pow<T>();});
         }
-      
+
+        lock_res.lock();
 
         size_t id = server.add_task(std::move(result));
-        
-        cv.wait(lock_res, [&](){ return results.find(id) != results.end(); });
 
-        if (task_type == 0) {
-            cout << "id is:" << id << ", task_thread result(sin):\t" << server.request_result(id) << endl;
-            ready_task = true;
-        } else if (task_type == 1) {
-            cout << "id is:" << id << ", task_thread result(sqrt):\t" << server.request_result(id) << endl;
-            ready_task = true;
-        } else {
-            cout << "id is:" << id << ", task_thread result(pow):\t" << server.request_result(id) << endl;
-            ready_task = true;
+        cv.notify_one();
+
+        lock_res.unlock();
+
+        lock_res.lock();
+
+        while (results.find(id) == results.end()) {
+            cv2.wait(lock_res);
+
+            if (results.find(id) != results.end()) {
+                // cout << "id is:" << id << ", task_thread result(sin):";
+                cout << "id is: " << id << " task_thread result:\t" << server.request_result(id) << endl;
+
+                break;
+            }
         }
-       
 
-        ready_task = false;
+        lock_res.unlock();
     }
+
+    cout << "Client work is done" << endl;
 }
 
 int main() {
     server.start();
 
-    thread task1(add_task<Type>);
-    thread task2(add_task<Type>);
-    thread task3(add_task<Type>);
-
-
-
+    thread task1(add_tasks<Type>);
+    thread task2(add_tasks<Type>);
+    thread task3(add_tasks<Type>);
 
     task1.join();
     task2.join();
