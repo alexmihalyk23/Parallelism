@@ -18,7 +18,7 @@ condition_variable cv, cv2;
 
 queue<pair<size_t, future<Type>>> tasks;
 queue<pair<size_t, future<Type>>> get_tasks;
-
+ 
 unordered_map<size_t, Type> results;
 
 void server_thread(const stop_token& stoken)
@@ -34,33 +34,36 @@ void server_thread(const stop_token& stoken)
             cv.wait(lock_res);
 
         if (!tasks.empty()) {
+            //  для того чтобы перенести данные из tasks.front.second в get_tasks.front.second()
             get_tasks.push({tasks.front().first, std::move(tasks.front().second)});
-
+            // вытаскиваем из pop-ы
             tasks.pop();
         }
+        // разблокируем поток
 
         lock_res.unlock();
 
 
         
-
+        // пока очередь не пуста 
         while (!get_tasks.empty()) {
-
+            // получаем id таска
             id_task = get_tasks.front().first;
+            // через get начинаем ленивое выполнение, того что пришло от клиента через get
             Type result = get_tasks.front().second.get();
 
             lock_res.lock();
+            //  результаты помещаем в контейнер
 
             results.insert({id_task, result});
 
-            get_tasks.pop();
 
+            get_tasks.pop();
+            //  уведомляем потоки
             cv2.notify_all();
 
             lock_res.unlock();
         }
-
-
        
     }
 
@@ -80,7 +83,9 @@ public:
         lock_res.lock();
         cv.notify_all();
         lock_res.unlock();
+        // выполняем запрос на остановку
         server.request_stop();
+        // останавливаем сервер.....
         server.join();
 
         cout << "End\n";
@@ -88,13 +93,15 @@ public:
 
     size_t add_task(future<T> task) {
         size_t id = rand();
+        // помещаем таск в очередь tasks
         tasks.push({id, std::move(task)});
-        // cv.notify_all();
+
         return id;
     };
 
     T request_result(size_t id_res) {
         T res = results[id_res];
+        // убираем чтобы конфликтов не было(надо короче))))(дописать)
         results.erase(id_res);
         return res;
     };
@@ -142,6 +149,7 @@ void add_tasks() {
         future<T> result;
 
         if (i % 3 == 0) {
+            //  результаты ленивого выполнения в result сами результаты будут только когда сервер запросит get()
             result = async(launch::deferred, [](){return fun_sin<T>();});
         } else if (i % 3 == 1) {
             result = async(launch::deferred, [](){return fun_sqrt<T>();});
@@ -150,13 +158,13 @@ void add_tasks() {
         }
 
         lock_res.lock();
-
+        // помещаем в queue
         size_t id = server.add_task(std::move(result));
 
         cv.notify_one();
 
         lock_res.unlock();
-
+        
         lock_res.lock();
 
         while (results.find(id) == results.end()) {
@@ -164,6 +172,7 @@ void add_tasks() {
 
             if (results.find(id) != results.end()) {
                 // cout << "id is:" << id << ", task_thread result(sin):";
+                // запрос на результат по id 
                 cout << "id is: " << id << " task_thread result:\t" << server.request_result(id) << endl;
 
                 break;
