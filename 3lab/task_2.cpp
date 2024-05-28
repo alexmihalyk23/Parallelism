@@ -101,7 +101,7 @@ public:
 
     T request_result(size_t id_res) {
         T res = results[id_res];
-        // убираем чтобы конфликтов не было(надо короче))))(дописать)
+        // убираем чтобы конфликтов не было
         results.erase(id_res);
         return res;
     };
