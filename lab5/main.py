@@ -3,7 +3,6 @@ import argparse
 import time
 from concurrent.futures import ThreadPoolExecutor
 from ultralytics import YOLO
-from threading import Thread, Lock
 
 class VideoCap:
     def __init__(self, video_path):
@@ -17,11 +16,10 @@ class VideoCap:
 
 class ThreadSafeYOLO:
     def __init__(self, model_path):
-        self.model_path = model_path
+        self.model = YOLO(model_path)
 
     def predict(self, frame):
-        model = YOLO(self.model_path)
-        result = model(frame, device='cpu')[0].plot()
+        result = self.model(frame, device='cpu')[0].plot()
         return result
 
 class VideoProcessor:
@@ -42,20 +40,21 @@ class VideoProcessor:
 
             out = cv2.VideoWriter(self.output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_width, frame_height))
 
-            def process_frame_wrapper(frame, index):
-                processed_frame = self.process_frame(frame, ThreadSafeYOLO('yolov8n-pose.pt'))
+            def process_frame_wrapper(frame, index, yolo_model):
+                processed_frame = self.process_frame(frame, yolo_model)
                 return index, processed_frame
-                
 
             start_time = time.time()
 
             with ThreadPoolExecutor(max_workers=num_threads) as executor:
+                yolo_models = [ThreadSafeYOLO('yolov8n-pose.pt') for _ in range(num_threads)]
                 futures = []
                 for i in range(num_frames):
                     ret, frame = video.read()
                     if not ret:
                         break
-                    futures.append(executor.submit(process_frame_wrapper, frame, i))
+                    yolo_model = yolo_models[i % num_threads]
+                    futures.append(executor.submit(process_frame_wrapper, frame, i, yolo_model))
 
                 processed_frames = [None] * num_frames
                 for future in futures:
