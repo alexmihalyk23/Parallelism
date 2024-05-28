@@ -36,7 +36,7 @@ void server_thread(const stop_token& stoken)
         if (!tasks.empty()) {
             //  для того чтобы перенести данные из tasks.front.second в get_tasks.front.second()
             get_tasks.push({tasks.front().first, std::move(tasks.front().second)});
-            // вытаскиваем из pop-ы
+          
             tasks.pop();
         }
         // разблокируем поток
