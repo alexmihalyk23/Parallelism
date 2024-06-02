@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iomanip>
 #include <chrono>
+#include <nvtx3/nvToolsExt.h>
 namespace opt = boost::program_options;
 
 template <class ctype>
@@ -87,12 +88,13 @@ int main(int argc, char const *argv[]) {
 
     double error = 1.0;
     int iter = 0;
-
+    nvtxRangePushA("init");
     Data<double> A(N * N);
     Data<double> Anew(N * N);
 
     initMatrix(A.arr, N);
     initMatrix(Anew.arr, N);
+    nvtxRangePop();
 
     auto start = std::chrono::high_resolution_clock::now();
     double* curmatrix = A.arr.data();
@@ -100,8 +102,10 @@ int main(int argc, char const *argv[]) {
 
     #pragma acc data copyin(error,prevmatrix[0:N*N],curmatrix[0:N*N])
     {
+        nvtxRangePushA("while");
         while (iter < countIter && iter < 10000000 && error > accuracy) {
             #pragma acc parallel loop independent collapse(2) present(curmatrix,prevmatrix)
+            
             for (size_t i = 1; i < N-1; i++) {
                 for (size_t j = 1; j < N-1; j++) {
                     curmatrix[i*N+j]  = 0.2 * (prevmatrix[i*N+j+1] + prevmatrix[i*N+j-1] + prevmatrix[(i-1)*N+j] + prevmatrix[(i+1)*N+j] + prevmatrix[i*N+j]);
@@ -124,6 +128,7 @@ int main(int argc, char const *argv[]) {
             std::swap(prevmatrix, curmatrix);
             iter++;
         }
+        nvtxRangePop();
         #pragma acc update self(curmatrix[0:N*N])
     }
 
