@@ -141,7 +141,7 @@ int main(int argc, char const *argv[]) {
                     std::cout << "iteration: "<<iter+1 << ' ' <<"error: "<<error << std::endl;
                 #pragma acc host_data use_device(curmatrix,prevmatrix)
                 {
-                    // чтобы не было нулей в матрице после вычитания
+                    // копируем из cur в prev
                     stat = cublasDcopy(handle,N*N,curmatrix,1,prevmatrix,1);
                 }
             }
