@@ -126,7 +126,7 @@ int main(int argc, char const *argv[]) {
                 }
             }
 
-            if ((iter+1)%1000 == 0){
+            
                 #pragma acc data present(prevmatrix,curmatrix)
                 // явно указываем ссылки на данные на девайсе
                 #pragma acc host_data use_device(curmatrix,prevmatrix)
@@ -138,13 +138,15 @@ int main(int argc, char const *argv[]) {
                 }
                 #pragma acc update self(prevmatrix[idx-1])
                     error = fabs(prevmatrix[idx-1]);
+                    if ((iter+1)%1000 == 0){
                     std::cout << "iteration: "<<iter+1 << ' ' <<"error: "<<error << std::endl;
+                    }
                 #pragma acc host_data use_device(curmatrix,prevmatrix)
                 {
                     // копируем из cur в prev
                     stat = cublasDcopy(handle,N*N,curmatrix,1,prevmatrix,1);
                 }
-            }
+            
             std::swap(prevmatrix, curmatrix);
             iter++;
         }
